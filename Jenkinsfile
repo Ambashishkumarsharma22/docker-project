@@ -1,15 +1,19 @@
 pipeline {
     agent any
 
+    environment {
+        GIT_SSL_NO_VERIFY = 'true'
+    }
+
     stages {
-        stage('Configure Git SSL') {
+        stage('Disable Git SSL Verification') {
             steps {
-                // This sets Git to use macOS's system certificates
-                sh 'git config --global http.sslCAInfo /etc/ssl/cert.pem'
+                echo 'Temporarily disabling Git SSL verification...'
+                sh 'git config --global http.sslVerify false'
             }
         }
 
-        stage('Clone') {
+        stage('Clone Repository') {
             steps {
                 echo 'Cloning repository...'
                 checkout scm
@@ -18,35 +22,33 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh 'docker build -t food-delivery-app:latest .'
-                }
+                echo 'Building Docker image...'
+                sh 'docker build -t food-delivery-app .'
             }
         }
 
-        stage('Run Container') {
+        stage('Run Docker Container') {
             steps {
-                script {
-                    sh 'docker run -d -p 3000:3000 food-delivery-app:latest'
-                }
+                echo 'Running Docker container...'
+                sh 'docker run -d -p 8080:8080 --name food-container food-delivery-app'
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login --username "$DOCKER_USER" --password-stdin
-                        docker tag food-delivery-app:latest "$DOCKER_USER/food-delivery-app:latest"
-                        docker push "$DOCKER_USER/food-delivery-app:latest"
-                    '''
-                }
+                echo 'Pushing Docker image to Docker Hub...'
+                // Replace with your Docker Hub credentials setup
+                sh '''
+                docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+                docker tag food-delivery-app $DOCKER_USERNAME/food-delivery-app
+                docker push $DOCKER_USERNAME/food-delivery-app
+                '''
             }
         }
 
         stage('Done') {
             steps {
-                echo 'Build and Run complete!'
+                echo 'Pipeline completed successfully.'
             }
         }
     }
